@@ -2,14 +2,18 @@ module Test.Machine.Core.Computer(
   tests
 ) where
 
-import qualified Data.Vector as V
-import qualified Data.Map as M
-
 import Machine.Core.Types
 import Machine.Core.Computer
-import Test.Machine.QuickCheck
-import Test.QuickCheck hiding (Result)
+import Test.Machine.QuickCheck as Test
+
+import Control.Monad
+import Data.Either
+import qualified Data.Vector as V
+import qualified Data.Map as M
 import Debug.Trace
+import Text.Printf (printf)
+import Test.QuickCheck hiding (Result)
+import qualified Test.QuickCheck.Monadic as QC
 
 tests :: TestSuite
 tests = map (\(x, y) -> ("Computer - " ++ x, y))
@@ -19,6 +23,8 @@ tests = map (\(x, y) -> ("Computer - " ++ x, y))
    ,("Infinite Loop",                 testInfiniteLoop)
    ,("Rand Inc",                      testRandInc)
    ,("Machine initialised properly",  testMachineInit)
+   ,("Performance",                   testPerfComputer)
+   ,("Combine programs",              testCombinePrograms)
   ]
 
 runProgram :: [Instruction] -> Either String Result
@@ -38,11 +44,10 @@ testBasicOp =
 
 testCopyLoop :: Test
 testCopyLoop =
-  TestPure $ const $
-    r == 5
-  where
-    r = getResUnSafe $ runProgram $
-      Zero 0 : Zero 1 : replicate 5 (Inc 1) ++ [Inc 0, Jump 0 1 7]
+  TestQC $ run $ forAll (choose (1, memLimit - 1)) $ \ i ->
+    let r = getResUnSafe $ runProgram $
+          Zero 0 : Zero 1 : replicate 5 (Inc i) ++ [Inc 0, Jump 0 i 7]
+     in r == 5
 
 testRandInc :: Test
 testRandInc =
@@ -53,9 +58,7 @@ testRandInc =
 testInfiniteLoop :: Test
 testInfiniteLoop =
   TestPure $ const $
-    r == "Loop detected"
-  where
-    (Left r) = runProgram [ Inc 0, Jump 0 1 0 ]
+    isLeft $ runProgram [ Inc 0, Jump 0 1 0 ]
 
 testMachineInit :: Test
 testMachineInit =
@@ -64,3 +67,26 @@ testMachineInit =
     in 0 == V.foldl (\ acc x -> acc + x) 0 (memory m)
     && 0 == M.size (operationCount m)
     && 0 == programCounter m
+
+testPerfComputer :: Test
+testPerfComputer =
+  TestQC $ Test.runWith 5 $ forAll (choose (1, memLimit - 1)) $
+    \ i -> QC.monadicIO $ do
+      let n = 1000000
+      t <- QC.run $ time $ getResUnSafe $ runProgram $
+              replicate n (Inc i) ++ [Inc 0, Jump 0 i n]
+
+      let res = t < 8.5
+      unless res $
+        QC.run $ printf "Time : %0.9f sec" t
+      QC.assert res
+
+testCombinePrograms :: Test
+testCombinePrograms =
+  TestQC $ run $ forAll (fmap (\(x,y) -> (abs x, abs y)) arbitrary) $
+    \ (i, j) -> let
+        (Right (Finished _ m)) = runProgram $ replicate i $ Inc 0
+        y = getResUnSafe $
+          compute (Program $ V.fromList $ replicate j $ Inc 0)
+            (Just m) Nothing
+      in y == ( i + j )

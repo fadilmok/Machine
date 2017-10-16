@@ -13,13 +13,13 @@ import Data.Vector
 import Data.Map
 
 newtype Program = Program { unP :: Vector Instruction }
-  deriving Show
+  deriving (Show, Eq)
 
 data Instruction =
     Zero Int
   | Inc  Int
   | Jump Int Int Int
-  deriving Show
+  deriving (Show, Eq)
 
 data Machine = Machine {
     memory         :: Vector Int
