@@ -27,7 +27,7 @@ checkFiles files = do
     withExceptT (\ e -> "In file: "++ f ++ " - "++ e) $
       parseProgram is
     return $ length is
-  return $ sum programLengths + 1
+  return $ (sum programLengths + 1) ^ complexityAllowed
 
 loadProgram :: FilePath -> ExceptT String IO Program
 loadProgram f = do

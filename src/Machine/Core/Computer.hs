@@ -3,23 +3,25 @@ module Machine.Core.Computer(
   compute
  ,mkMachine
  ,memLimit
+ ,complexityAllowed
  ,checkInstr
 ) where
 
 import Machine.Core.Types
 
 import Control.Monad
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Control.Monad.Except
 import Data.Maybe
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Vector as V
 
 compute :: Program -> Maybe Machine -> Maybe Int -> Either String Result
 compute prog machineM opCountLimitM = do
   let machine  = fromMaybe mkMachine machineM
-      opCL     = fromMaybe (V.length (unP prog) + 1) opCountLimitM
+      opCL     = fromMaybe ((V.length (unP prog) + 1) ^ complexityAllowed)
+                    opCountLimitM
       computer = mkComputer
 
   (res, m) <- runExcept $
@@ -41,12 +43,17 @@ mkMachine = Machine {
 memLimit :: Int
 memLimit = 32
 
+-- | limit on operation count: n^complexityAllowed
+complexityAllowed :: Int
+complexityAllowed = 5
+
 mkComputer :: Computer
 mkComputer = do
   (Program is, opCountLim) <- ask
   m@(Machine cells pC oC) <- get
   if pC >= V.length is
-     then return $ Finished (cells V.! 0) m
+     then
+      return $ Finished (cells V.! 0) m
      else do
        when (pC `M.member` oC && oC M.! pC == opCountLim) $
           throwError "Loop detected"

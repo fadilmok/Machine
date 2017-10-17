@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Machine.Core.Types(
   Program(..)
  ,Instruction(..)
@@ -6,25 +7,25 @@ module Machine.Core.Types(
  ,Computer
 ) where
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Control.Monad.Except
 import Data.Vector
-import Data.Map
+import Data.Map.Strict
 
 newtype Program = Program { unP :: Vector Instruction }
   deriving (Show, Eq)
 
 data Instruction =
-    Zero Int
-  | Inc  Int
-  | Jump Int Int Int
+    Zero {-# UNPACK #-} !Int
+  | Inc  {-# UNPACK #-} !Int
+  | Jump {-# UNPACK #-} !Int {-# UNPACK #-} !Int {-# UNPACK #-} !Int
   deriving (Show, Eq)
 
 data Machine = Machine {
-    memory         :: Vector Int
-   ,programCounter :: Int
-   ,operationCount :: Map Int Int
+    memory         :: !(Vector Int)
+   ,programCounter :: !Int
+   ,operationCount :: !(Map Int Int)
   } deriving Show
 
 data Result =
