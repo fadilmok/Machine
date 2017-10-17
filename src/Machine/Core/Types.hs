@@ -28,9 +28,10 @@ data Machine = Machine {
    ,operationCount :: !(Map Int Int)
   } deriving Show
 
-data Result =
-    Running
-  | Finished Int Machine
+data Result = Result Int Machine
   deriving Show
 
-type Computer = ReaderT (Program, Int) (StateT Machine (Except String)) Result
+-- | A computer which has the program and the operation count limit
+-- in a reader monad, the state is its machine and m is the error
+-- handling scheme, return a result.
+type Computer m = ReaderT (Program, Int) (StateT Machine m) Result

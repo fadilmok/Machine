@@ -17,21 +17,17 @@ import Data.Maybe
 import qualified Data.Map.Strict as M
 import qualified Data.Vector as V
 
-compute :: Program -> Maybe Machine -> Maybe Int -> Either String Result
+compute :: MonadError String m => Program -> Maybe Machine -> Maybe Int -> m Result
 compute prog machineM opCountLimitM = do
   let machine  = fromMaybe mkMachine machineM
       opCL     = fromMaybe ((V.length (unP prog) + 1) ^ complexityAllowed)
                     opCountLimitM
-      computer = mkComputer
 
-  (res, m) <- runExcept $
-                  flip runStateT machine $
+  (Result r m) <- flip evalStateT machine $
                      flip runReaderT (prog, opCL)
-                        computer
-  case res of
-    Running       -> compute prog (Just m) $ Just opCL
-    Finished r m  -> Right $ Finished r
-                        m{operationCount = M.empty, programCounter = 0}
+                        runComputer
+  return $
+    Result r m{operationCount = M.empty, programCounter = 0}
 
 mkMachine :: Machine
 mkMachine = Machine {
@@ -47,19 +43,19 @@ memLimit = 32
 complexityAllowed :: Int
 complexityAllowed = 5
 
-mkComputer :: Computer
-mkComputer = do
+runComputer :: MonadError String m => Computer m
+runComputer = do
   (Program is, opCountLim) <- ask
   m@(Machine cells pC oC) <- get
   if pC >= V.length is
      then
-      return $ Finished (cells V.! 0) m
+      return $ Result (cells V.! 0) m
      else do
        when (pC `M.member` oC && oC M.! pC == opCountLim) $
           throwError "Loop detected"
        let i = is V.! pC
            updateMachine :: MonadState Machine m => Int -> Int -> m()
-           updateMachine x v = do
+           updateMachine x v =
              put m{
                   memory = cells V.// [(x, v)]
                  ,programCounter = pC + 1
@@ -74,7 +70,7 @@ mkComputer = do
                programCounter = if cells V.! x /= cells V.! y then t else pC + 1
               ,operationCount = M.insertWith (+) pC 1 oC
              }
-       return Running
+       runComputer
 
 checkInstr :: MonadError String m => Instruction -> Int -> Int -> m()
 checkInstr (Zero x) pL pC = do

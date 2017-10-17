@@ -7,7 +7,6 @@ import Machine.Core.Computer
 import Machine.Core.Types
 import Test.Machine.QuickCheck as Test
 
-import Control.Monad.Except
 import Data.Either
 import qualified Data.Vector as V
 import Test.QuickCheck hiding (Result)
@@ -21,7 +20,7 @@ tests = map (\ (x, y) -> ("Loader - " ++ x, y))
   ]
 
 parseP :: [String] -> Either String Program
-parseP = runExcept . parseProgram
+parseP = parseProgram
 
 mkP :: [Instruction] -> Program
 mkP = Program . V.fromList
@@ -42,4 +41,5 @@ testParseInstrFail =
   TestPure $ const $
     isLeft (parseP ["i -1"]) &&
       isLeft (parseP ["j0,1,0"]) &&
-        isLeft (parseP ["I \2"])
+        isLeft (parseP ["I \2"]) &&
+          isLeft (parseP ["i40"])

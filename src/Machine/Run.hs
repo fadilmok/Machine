@@ -19,18 +19,15 @@ main = do
     when (length files < 1) $
       throwError "At least one file need to be passed as argument."
     opLimit <- checkFiles files
-    (_, r) <- foldM (run opLimit) (mkMachine, -1) files
+    (Result r _) <- foldM (run opLimit) (Result (-1) mkMachine) files
     return r
   putStrLn $ case res of
     Left err -> "There was an error: " ++ err
     Right r  -> "The run is successful, the result is: " ++ show r
 
-run :: Int -> (Machine, Int) -> FilePath -> ExceptT String IO (Machine, Int)
-run oL (m, _) f = do
+-- | Run one program at the time, using the previous state of the machine
+run :: Int -> Result -> FilePath -> ExceptT String IO Result
+run oL (Result _ m) f = do
   program <- loadProgram f
   lift $ putStrLn $ "Running program " ++ f
-  let res = compute program (Just m) $ Just oL
-  case res of
-    Left err              -> throwError err
-    Right Running         -> throwError "The program has not run completely"
-    Right (Finished r m') -> return (m', r)
+  compute program (Just m) $ Just oL
